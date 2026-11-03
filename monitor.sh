@@ -22,13 +22,14 @@ while getopts "cw:t" opt; do
 done
 
 # 1 人 1 行で状態を出力する。区切りは \x1f、ファイルの中身は base64
-#   row SEP id SEP status SEP author SEP 時刻(unix) SEP 時刻(相対) SEP 件名 SEP 補足 SEP 中身
+#   row SEP id SEP status SEP author SEP 時刻(unix) SEP 時刻(相対) SEP 件名 SEP 補足 SEP 中身 SEP 自己紹介用の中身
+# 自己紹介用の中身は運営が書き換えた直後 (INJECTED) だけ、書き換え前の受講者の版が入る。それ以外は空
 # 最後に形式外のブランチ (odd) と名簿にないブランチ (extra) を 1 行ずつ出力する
 collect() {
   sync_work
 
   for id in $(all_ids); do
-    local ref="origin/$id" file="$id.md" status note="" author="" ct="" ar="" subject="" content=""
+    local ref="origin/$id" file="$id.md" status note="" author="" ct="" ar="" subject="" content="" intro=""
 
     if ! has_ref "$id"; then
       status="NO_BRANCH"
@@ -51,6 +52,7 @@ collect() {
           status="PUSHED"
         elif [ "$(g rev-parse "$ref")" = "$inject" ]; then
           status="INJECTED"; note="受講者の対応待ち"
+          intro=$(g show "$inject^:$file" 2>/dev/null | base64 -w0)
         elif [ -n "$(g rev-list --merges "$inject..$ref")" ]; then
           status="RESOLVED"; note="merge で解決"
         else
@@ -59,7 +61,7 @@ collect() {
       fi
     fi
 
-    printf '%s\n' "row$SEP$id$SEP$status$SEP$author$SEP$ct$SEP$ar$SEP${subject//$'\t'/ }$SEP$note$SEP$content"
+    printf '%s\n' "row$SEP$id$SEP$status$SEP$author$SEP$ct$SEP$ar$SEP${subject//$'\t'/ }$SEP$note$SEP$content$SEP$intro"
   done
 
   printf 'odd%s%s\n' "$SEP" "$(remote_branches | grep -Ev "$ID_REGEX" | tr '\n' ' ')"
@@ -78,7 +80,7 @@ report() {
   printf '%-10s %-14s %s\n' "ID" "STATUS" "最新コミット"
   printf '%s\n' "------------------------------------------------------------------"
 
-  while IFS=$SEP read -r kind id status author ct ar subject note content; do
+  while IFS=$SEP read -r kind id status author ct ar subject note content _intro; do
     case $kind in
       odd) odd=$id; continue ;;
       extra) extra=$id; continue ;;

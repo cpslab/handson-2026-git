@@ -16,6 +16,8 @@
     --gray-420: #949494;   /* 白に対して 3:1 (枠線) */
     --gray-600: #666666;   /* 白に対して 4.5:1 以上 (補足テキスト) */
     --gray-900: #1a1a1a;   /* 本文 */
+    --black: #000000;
+    --yellow-300: #ffd43d; /* フォーカスインジケーター */
 
     --blue-50: #e8f1fe;   --blue-900: #0031d8;
     --green-50: #e6f5ec;  --green-600: #259d63;  --green-800: #197a4b;
@@ -113,23 +115,70 @@
   .warn:empty { display: none; }
   .empty { color: var(--gray-600); font-size: 20px; padding: var(--sp-5) 0; }
 
+  /* 表示切り替え */
+  .tabs { display: flex; gap: 0; }
+  .tabs button {
+    font: inherit; font-size: 17px; font-weight: 700; line-height: 1; cursor: pointer;
+    padding: 12px var(--sp-3); border: 1px solid var(--blue-900); background: var(--white); color: var(--blue-900);
+  }
+  .tabs button:first-child { border-radius: var(--radius-s) 0 0 var(--radius-s); }
+  .tabs button:last-child { border-radius: 0 var(--radius-s) var(--radius-s) 0; border-left: 0; }
+  .tabs button[aria-pressed="true"] { background: var(--blue-900); color: var(--white); }
+  .tabs button:focus-visible { outline: 4px solid var(--black); outline-offset: 2px; box-shadow: 0 0 0 2px var(--yellow-300); }
+  .head-right { display: flex; align-items: center; gap: var(--sp-3); flex-wrap: wrap; }
+
+  /* 自己紹介 */
+  .intro-count { font-size: 20px; font-weight: 700; margin: var(--sp-3) 0 var(--sp-2); }
+  .intro-count span { color: var(--gray-600); font-weight: 400; font-size: 17px; }
+  .intros { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: var(--sp-2); }
+  .intro {
+    border: 1px solid var(--gray-420); border-radius: var(--radius-m); background: var(--white);
+    padding: var(--sp-2) var(--sp-3) var(--sp-3); min-width: 0;
+  }
+  .intro .who { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-1); flex-wrap: wrap; }
+  .intro .name { font-size: 26px; line-height: 1.5; font-weight: 700; overflow-wrap: anywhere; }
+  .intro .name.blank { color: var(--gray-600); font-weight: 400; font-size: 20px; }
+  .intro .sid { font-family: var(--mono); font-size: 16px; color: var(--gray-600); }
+  .intro .word {
+    margin: var(--sp-1) 0 0; font-size: 22px; line-height: 1.5; overflow-wrap: anywhere;
+    padding-left: var(--sp-2); border-left: 4px solid var(--blue-900);
+  }
+  .intro dl { margin: var(--sp-2) 0 0; display: grid; grid-template-columns: auto 1fr; gap: 4px var(--sp-2); font-size: 17px; }
+  .intro dt { color: var(--gray-600); }
+  .intro dd { margin: 0; overflow-wrap: anywhere; }
+  .intro .extra { margin: var(--sp-1) 0 0; font-size: 17px; overflow-wrap: anywhere; }
+
   footer { position: fixed; right: var(--sp-3); bottom: var(--sp-2); color: var(--gray-600); font-size: 14px; background: var(--white); }
   kbd { font-family: var(--mono); border: 1px solid var(--gray-420); border-radius: 4px; padding: 0 6px; }
 </style>
 </head>
 <body>
   <header>
-    <h1>git ハンズオン 進捗</h1>
-    <div class="updated"><span class="dot" id="dot" aria-hidden="true"></span><span id="updated">読み込み中…</span></div>
+    <h1 id="title">git ハンズオン 進捗</h1>
+    <div class="head-right">
+      <div class="tabs">
+        <button type="button" data-view="progress" aria-pressed="true">進捗</button>
+        <button type="button" data-view="intro" aria-pressed="false">自己紹介</button>
+      </div>
+      <div class="updated"><span class="dot" id="dot" aria-hidden="true"></span><span id="updated">読み込み中…</span></div>
+    </div>
   </header>
 
-  <div class="stats" id="stats"></div>
-  <div class="bar" id="bar" aria-hidden="true"></div>
-  <div class="error" id="error" role="alert"><strong>取得に失敗しました（前回の結果を表示中）</strong><pre id="error-msg"></pre></div>
-  <div class="grid" id="grid"></div>
-  <div class="warn" id="warn"></div>
+  <div class="error" id="error" role="alert" style="margin-top: var(--sp-3)"><strong>取得に失敗しました（前回の結果を表示中）</strong><pre id="error-msg"></pre></div>
 
-  <footer><kbd>C</kbd> ファイルの中身 &nbsp; <kbd>F</kbd> 全画面</footer>
+  <section id="view-progress">
+    <div class="stats" id="stats"></div>
+    <div class="bar" id="bar" aria-hidden="true"></div>
+    <div class="grid" id="grid"></div>
+    <div class="warn" id="warn"></div>
+  </section>
+
+  <section id="view-intro" hidden>
+    <div class="intro-count" id="intro-count"></div>
+    <div class="intros" id="intros"></div>
+  </section>
+
+  <footer><kbd>1</kbd> 進捗 &nbsp; <kbd>2</kbd> 自己紹介 &nbsp; <kbd>C</kbd> ファイルの中身 &nbsp; <kbd>F</kbd> 全画面</footer>
 
 <script>
   const POLL_MS = 5000;
@@ -236,6 +285,8 @@
     }
     prev = Object.fromEntries(rows.map(r => [r.id, r.status]));
 
+    renderIntro(rows);
+
     const warn = [];
     if (data.odd.length) warn.push("学籍番号の形式でないブランチ: " + data.odd.join(", "));
     if (data.extra.length) warn.push("名簿にないブランチ: " + data.extra.join(", "));
@@ -246,6 +297,68 @@
     $("dot").classList.toggle("stale", !!data.error);
     $("updated").textContent = new Date(data.updated * 1000).toLocaleTimeString("ja-JP") + " 更新";
   }
+
+  // 「名前: 〜」形式の行を項目に、それ以外の行を本文として取り出す。見出し (# 学籍番号) は捨てる
+  // コンフリクトマーカーが残っていたら本人側 (HEAD 側) だけを使う
+  function parseIntro(text) {
+    const fields = [], lines = [];
+    let theirs = false;
+    for (const raw of text.split(/\r?\n/)) {
+      if (/^<<<<<<< /.test(raw)) continue;
+      if (/^=======\s*$/.test(raw)) { theirs = true; continue; }
+      if (/^>>>>>>> /.test(raw)) { theirs = false; continue; }
+      if (theirs) continue;
+      const line = raw.trim();
+      if (!line || /^#/.test(line)) continue;
+      const m = line.match(/^(?:[-*]\s*)?([^:：]{1,20})[:：]\s*(.*)$/);
+      if (m) fields.push([m[1].trim(), m[2].trim()]);
+      else lines.push(line.replace(/^[-*]\s+/, ""));
+    }
+    return { fields, lines };
+  }
+
+  function renderIntro(rows) {
+    const written = rows.filter(r => r.intro);
+    $("intro-count").replaceChildren("自己紹介 ", el("span", null, `${rows.length} 人中 ${written.length} 人`));
+
+    if (!written.length) {
+      $("intros").replaceChildren(el("div", "empty", "まだ誰も push していません"));
+      return;
+    }
+    $("intros").replaceChildren(...written.map(r => {
+      const { fields, lines } = parseIntro(r.intro);
+      const take = key => {
+        const i = fields.findIndex(([k]) => k === key);
+        return i < 0 ? "" : fields.splice(i, 1)[0][1];
+      };
+      const name = take("名前");
+      const word = take("ひとこと");
+
+      const card = el("article", "intro");
+      const who = el("div", "who");
+      who.append(el("span", "name" + (name ? "" : " blank"), name || "（名前なし）"), el("span", "sid", r.id));
+      card.append(who);
+      if (word) card.append(el("p", "word", word));
+      if (fields.length) {
+        const dl = el("dl");
+        for (const [k, v] of fields) dl.append(el("dt", null, k), el("dd", null, v));
+        card.append(dl);
+      }
+      for (const line of lines) card.append(el("p", "extra", line));
+      return card;
+    }));
+  }
+
+  function setView(view) {
+    if (view !== "intro") view = "progress";
+    $("view-progress").hidden = view !== "progress";
+    $("view-intro").hidden = view !== "intro";
+    document.querySelectorAll(".tabs button").forEach(b => b.setAttribute("aria-pressed", b.dataset.view === view));
+    $("title").textContent = view === "intro" ? "git ハンズオン 自己紹介" : "git ハンズオン 進捗";
+    history.replaceState(null, "", view === "intro" ? "#intro" : "#");
+  }
+  document.querySelectorAll(".tabs button").forEach(b => b.addEventListener("click", () => setView(b.dataset.view)));
+  setView(location.hash.slice(1));
 
   async function poll() {
     $("dot").classList.add("busy");
@@ -262,6 +375,8 @@
   }
 
   document.addEventListener("keydown", e => {
+    if (e.key === "1") setView("progress");
+    if (e.key === "2") setView("intro");
     if (e.key === "c" || e.key === "C") document.body.classList.toggle("show-content");
     if (e.key === "f" || e.key === "F") {
       document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen();
