@@ -55,7 +55,7 @@
   @keyframes pulse { 50% { opacity: .3; } }
 
   /* 集計 */
-  .stats { display: flex; gap: var(--sp-2); margin: var(--sp-3) 0 var(--sp-2); flex-wrap: wrap; }
+  .stats { display: flex; gap: var(--sp-2); margin: var(--sp-3) 0; flex-wrap: wrap; }
   .stat {
     border: 1px solid var(--gray-420); border-radius: var(--radius-m); background: var(--white);
     padding: var(--sp-1) var(--sp-3) var(--sp-2); min-width: 150px; border-top: 6px solid var(--c);
@@ -63,12 +63,6 @@
   .stat b { display: block; font-size: 48px; line-height: 1.4; font-weight: 700; font-variant-numeric: tabular-nums; }
   .stat span { font-size: 17px; font-weight: 700; }
 
-  .bar {
-    display: flex; height: 16px; border-radius: var(--radius-s); overflow: hidden;
-    background: var(--gray-50); border: 1px solid var(--gray-420); margin-bottom: var(--sp-3);
-  }
-  .bar div { background: var(--c); transition: flex-grow .6s ease; }
-  .bar div + div { border-left: 2px solid var(--white); }
 
   /* ノティフィケーションバナー (エラー) */
   .error {
@@ -168,7 +162,6 @@
 
   <section id="view-progress">
     <div class="stats" id="stats"></div>
-    <div class="bar" id="bar" aria-hidden="true"></div>
     <div class="grid" id="grid"></div>
     <div class="warn" id="warn"></div>
   </section>
@@ -185,11 +178,11 @@
 
   // チップラベルの配色 (DADS のチップラベル例: 開始前=グレー / 作業中=青 / 完了=緑 / 保留=黄・橙 / 中止=赤)
   const TONE = {
-    gray:   { text: "var(--gray-600)",   line: "var(--gray-420)",   bg: "var(--white)",     bar: "var(--gray-420)" },
-    blue:   { text: "var(--blue-900)",   line: "var(--blue-900)",   bg: "var(--blue-50)",   bar: "var(--blue-900)" },
-    orange: { text: "var(--orange-900)", line: "var(--orange-600)", bg: "var(--orange-50)", bar: "var(--orange-600)" },
-    green:  { text: "var(--green-800)",  line: "var(--green-600)",  bg: "var(--green-50)",  bar: "var(--green-600)" },
-    red:    { text: "var(--red-900)",    line: "var(--red-800)",    bg: "var(--red-50)",    bar: "var(--red-800)" },
+    gray:   { text: "var(--gray-600)",   line: "var(--gray-420)",   bg: "var(--white)",     accent: "var(--gray-420)" },
+    blue:   { text: "var(--blue-900)",   line: "var(--blue-900)",   bg: "var(--blue-50)",   accent: "var(--blue-900)" },
+    orange: { text: "var(--orange-900)", line: "var(--orange-600)", bg: "var(--orange-50)", accent: "var(--orange-600)" },
+    green:  { text: "var(--green-800)",  line: "var(--green-600)",  bg: "var(--green-50)",  accent: "var(--green-600)" },
+    red:    { text: "var(--red-900)",    line: "var(--red-800)",    bg: "var(--red-50)",    accent: "var(--red-800)" },
   };
   const STATUS = {
     RESOLVED:     { label: "解決",             mark: "✓", tone: "green" },
@@ -257,14 +250,8 @@
     };
     $("stats").replaceChildren(
       stat(rows.length, "参加者", "var(--gray-900)"),
-      ...groups.map(([k, label, tone]) => stat(counts[k] || 0, label, TONE[tone].bar))
+      ...groups.map(([k, label, tone]) => stat(counts[k] || 0, label, TONE[tone].accent))
     );
-    $("bar").replaceChildren(...groups.map(([k, , tone]) => {
-      const d = el("div");
-      d.style.setProperty("--c", TONE[tone].bar);
-      d.style.flexGrow = counts[k] || 0;
-      return d;
-    }));
 
     if (!rows.length) {
       $("grid").replaceChildren(el("div", "empty", "まだ誰も push していません"));
