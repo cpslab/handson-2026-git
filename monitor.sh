@@ -40,14 +40,16 @@ collect() {
       local inject
       inject=$(inject_commit "$ref")
 
-      if [ -z "$file" ]; then
+      if [ -z "$file" ] && [ "$(g rev-list --count "origin/main..$ref")" = 0 ]; then
+        status="BRANCH_ONLY"; note="ブランチだけ push 済み"
+      elif [ -z "$file" ]; then
         status="NO_FILE"
         note=$(g ls-tree --name-only "$ref" | grep -Ev '^(README|template)\.md$' | tr '\n' ' ')
         [ -n "$note" ] && note="ファイル: $note"
-        # 学籍番号.md を作らずにテンプレートを直接書き換えるミスが多いので知らせる
-        if ! g diff --quiet origin/main "$ref" -- template.md 2>/dev/null; then
-          note="${note:+$note / }template.md を直接編集している (コピーして $id.md にする)"
-        fi
+      elif [ -n "$inject" ] && [ "$(g rev-parse "$ref")" != "$inject" ] && g diff --quiet "$inject" "$ref" -- "$file"; then
+        # 運営のコミットの後に push があるのに 学籍番号.md が運営の版のまま
+        status="NO_FILE"; note="$file が運営の版のまま"
+        content=$(g show "$ref:$file" | base64 -w0)
       else
         content=$(g show "$ref:$file" | base64 -w0)
         if g show "$ref:$file" | grep -Eq '^(<<<<<<<|=======|>>>>>>>)'; then
@@ -63,6 +65,11 @@ collect() {
         else
           status="RESOLVED"; note="merge コミットなし (rebase か、pull 後に編集)"
         fi
+      fi
+
+      # 学籍番号.md を作らずにテンプレートを直接書き換えるミスが多いので知らせる
+      if [ "$status" = NO_FILE ] && ! g diff --quiet origin/main "$ref" -- template.md 2>/dev/null; then
+        note="${note:+$note / }template.md を直接編集している (コピーして $id.md にする)"
       fi
 
       local same
@@ -83,7 +90,7 @@ report() {
   local data
   data=$(collect) || return 1
 
-  local n_total=0 n_pushed=0 n_injected=0 n_resolved=0 n_problem=0 odd="" extra=""
+  local n_total=0 n_branch=0 n_pushed=0 n_injected=0 n_resolved=0 n_problem=0 odd="" extra=""
 
   printf '%s\n' "${C_DIM}$(date '+%H:%M:%S') 更新 / $REPO_URL${C_RST}"
   printf '%-10s %-14s %s\n' "ID" "STATUS" "最新コミット"
@@ -99,6 +106,7 @@ report() {
     n_total=$((n_total + 1))
     case $status in
       NO_BRANCH) color=$C_DIM ;;
+      BRANCH_ONLY) color=$C_RST; n_branch=$((n_branch + 1)) ;;
       PUSHED) color=$C_GRN; n_pushed=$((n_pushed + 1)) ;;
       INJECTED) color=$C_YEL; n_injected=$((n_injected + 1)) ;;
       RESOLVED) color=$C_CYN; n_resolved=$((n_resolved + 1)) ;;
@@ -114,8 +122,8 @@ report() {
   done <<< "$data"
 
   printf '%s\n' "------------------------------------------------------------------"
-  printf '全 %d 人 / push 済み %d / 書き換え済み %d / 解決 %d / 要対応 %s%d%s\n' \
-    "$n_total" "$n_pushed" "$n_injected" "$n_resolved" "$C_RED" "$n_problem" "$C_RST"
+  printf '全 %d 人 / ブランチのみ %d / push 済み %d / 仕込み済み %d / 解決 %d / 要対応 %s%d%s\n' \
+    "$n_total" "$n_branch" "$n_pushed" "$n_injected" "$n_resolved" "$C_RED" "$n_problem" "$C_RST"
   # 学籍番号の形式に合わないブランチ (打ち間違いの可能性)
   [ -n "$odd" ] && printf '%s形式外のブランチ: %s%s\n' "$C_YEL" "$odd" "$C_RST"
   [ -n "$extra" ] && printf '%s名簿にないブランチ: %s%s\n' "$C_YEL" "$extra" "$C_RST"

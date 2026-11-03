@@ -188,6 +188,7 @@
     RESOLVED:     { label: "解決",             mark: "✓", tone: "green" },
     INJECTED:     { label: "コンフリクト対応中", mark: "…", tone: "orange" },
     PUSHED:       { label: "push 済み",        mark: "↑", tone: "blue" },
+    BRANCH_ONLY:  { label: "ブランチ作成済み", mark: "↑", tone: "blue" },
     MARKER_LEFT:  { label: "マーカー残り",     mark: "!", tone: "red" },
     FORCE_PUSHED: { label: "force push",       mark: "!", tone: "red" },
     NO_FILE:      { label: "ファイルなし",     mark: "!", tone: "red" },
@@ -199,6 +200,7 @@
     ["RESOLVED", "解決", "green"],
     ["INJECTED", "コンフリクト対応中", "orange"],
     ["PUSHED", "push 済み", "blue"],
+    ["BRANCH_ONLY", "ブランチ作成済み", "blue"],
     ["PROBLEM", "要対応", "red"],
     ["NO_BRANCH", "未着手", "gray"],
   ];
@@ -240,7 +242,7 @@
       const k = PROBLEMS.includes(r.status) ? "PROBLEM" : r.status;
       counts[k] = (counts[k] || 0) + 1;
     }
-    const groups = GROUPS.filter(([k]) => counts[k] || k === "PUSHED");
+    const groups = GROUPS.filter(([k]) => counts[k]);
 
     const stat = (n, label, color) => {
       const s = el("div", "stat");
