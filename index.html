@@ -326,7 +326,7 @@
         return i < 0 ? "" : fields.splice(i, 1)[0][1];
       };
       const name = take("名前");
-      const word = take("ひとこと");
+      const word = take("一言") || take("ひとこと");
 
       const card = el("article", "intro");
       const who = el("div", "who");

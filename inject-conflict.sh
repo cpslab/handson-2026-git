@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 受講者ブランチの「ひとこと:」行を書き換えて push し、コンフリクトの種を仕込む。
+# 受講者ブランチの「一言:」行 (config.sh の TARGET_KEY) を書き換えて push し、コンフリクトの種を仕込む。
 #
 #   ./inject-conflict.sh -n            何をするかだけ表示 (dry run)
 #   ./inject-conflict.sh               対象の全ブランチに仕込む
@@ -24,7 +24,7 @@ else
   ids=$(all_ids)
 fi
 
-key_pattern="^${TARGET_KEY}(:|：)"
+key_pattern="^([-*] *)?${TARGET_KEY} *(:|：)"
 n_done=0
 
 for id in $ids; do
