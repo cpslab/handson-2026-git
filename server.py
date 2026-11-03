@@ -20,10 +20,6 @@ _lock = threading.Lock()
 _cache = {"at": 0.0, "data": {"rows": [], "odd": [], "extra": []}, "error": None}
 
 
-def b64(s):
-    return base64.b64decode(s).decode("utf-8", "replace") if s else ""
-
-
 def run_monitor():
     proc = subprocess.run(
         [BASH, os.path.join(HERE, "monitor.sh"), "-t"],
@@ -36,13 +32,12 @@ def run_monitor():
     for line in proc.stdout.decode("utf-8", "replace").splitlines():
         f = line.split(SEP)
         if f[0] == "row":
-            f += [""] * (10 - len(f))
-            _, id_, status, author, ct, ar, subject, note, content, intro = f[:10]
+            f += [""] * (9 - len(f))
+            _, id_, status, author, ct, ar, subject, note, content = f[:9]
             data["rows"].append({
                 "id": id_, "status": status, "author": author,
                 "time": int(ct) if ct else None, "subject": subject, "note": note,
-                "content": b64(content),
-                "intro": b64(intro or content),
+                "content": base64.b64decode(content).decode("utf-8", "replace") if content else "",
             })
         elif f[0] in ("odd", "extra") and len(f) > 1:
             data[f[0]] = f[1].split()

@@ -299,15 +299,9 @@
   }
 
   // 「名前: 〜」形式の行を項目に、それ以外の行を本文として取り出す。見出し (# 学籍番号) は捨てる
-  // コンフリクトマーカーが残っていたら本人側 (HEAD 側) だけを使う
   function parseIntro(text) {
     const fields = [], lines = [];
-    let theirs = false;
     for (const raw of text.split(/\r?\n/)) {
-      if (/^<<<<<<< /.test(raw)) continue;
-      if (/^=======\s*$/.test(raw)) { theirs = true; continue; }
-      if (/^>>>>>>> /.test(raw)) { theirs = false; continue; }
-      if (theirs) continue;
       const line = raw.trim();
       if (!line || /^#/.test(line)) continue;
       const m = line.match(/^(?:[-*]\s*)?([^:：]{1,20})[:：]\s*(.*)$/);
@@ -318,7 +312,7 @@
   }
 
   function renderIntro(rows) {
-    const written = rows.filter(r => r.intro);
+    const written = rows.filter(r => r.content);
     $("intro-count").replaceChildren("自己紹介 ", el("span", null, `${rows.length} 人中 ${written.length} 人`));
 
     if (!written.length) {
@@ -326,7 +320,7 @@
       return;
     }
     $("intros").replaceChildren(...written.map(r => {
-      const { fields, lines } = parseIntro(r.intro);
+      const { fields, lines } = parseIntro(r.content);
       const take = key => {
         const i = fields.findIndex(([k]) => k === key);
         return i < 0 ? "" : fields.splice(i, 1)[0][1];
