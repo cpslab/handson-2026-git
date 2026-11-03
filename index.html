@@ -4,94 +4,128 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>git ハンズオン 進捗</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&family=Noto+Sans+Mono:wght@400;700&display=swap">
 <style>
+  /* デジタル庁デザインシステム (DADS) に準拠
+     色: プリミティブカラー / セマンティックカラー、余白: 8px 基準、書体: Noto Sans JP / Noto Sans Mono */
   :root {
-    --bg: #0f1115;
-    --panel: #181b22;
-    --line: #2a2f3a;
-    --text: #eef1f6;
-    --muted: #8b93a3;
-    --gray: #5c6372;
-    --green: #3ecf8e;
-    --amber: #f5b83d;
-    --blue: #5aa9ff;
-    --red: #ff5d5d;
-    --mono: ui-monospace, "Cascadia Mono", "SF Mono", Consolas, monospace;
+    --white: #ffffff;
+    --gray-50: #f2f2f2;
+    --gray-420: #949494;   /* 白に対して 3:1 (枠線) */
+    --gray-600: #666666;   /* 白に対して 4.5:1 以上 (補足テキスト) */
+    --gray-900: #1a1a1a;   /* 本文 */
+
+    --blue-50: #e8f1fe;   --blue-900: #0031d8;
+    --green-50: #e6f5ec;  --green-600: #259d63;  --green-800: #197a4b;
+    --orange-50: #ffeee2; --orange-600: #fb5b01; --orange-900: #ac3e00;
+    --red-50: #fdeeee;    --red-800: #ec0000;    --red-900: #ce0000;
+
+    --sp-1: 8px; --sp-2: 16px; --sp-3: 24px; --sp-5: 40px;
+    --radius-s: 8px; --radius-m: 12px;
+
+    --font: "Noto Sans JP", "Hiragino Sans", "Yu Gothic UI", "Meiryo", sans-serif;
+    --mono: "Noto Sans Mono", ui-monospace, Consolas, monospace;
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; }
   body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: "Hiragino Sans", "Yu Gothic UI", "Meiryo", system-ui, sans-serif;
-    padding: 28px 36px 64px;
+    background: var(--white);
+    color: var(--gray-900);
+    font-family: var(--font);
+    font-size: 17px;
+    line-height: 1.7;
+    padding: var(--sp-3) var(--sp-5) 64px;
     min-height: 100vh;
   }
 
-  header { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
-  h1 { font-size: 34px; margin: 0; letter-spacing: .02em; }
-  .updated { color: var(--muted); font-size: 16px; display: flex; align-items: center; gap: 8px; }
-  .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--green); }
-  .dot.stale { background: var(--red); }
+  /* ヘッダー: Std-32B-150 */
+  header {
+    display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-2); flex-wrap: wrap;
+    padding-bottom: var(--sp-2); border-bottom: 1px solid var(--gray-420);
+  }
+  h1 { font-size: 32px; line-height: 1.5; font-weight: 700; letter-spacing: .01em; margin: 0; }
+  .updated { color: var(--gray-600); font-size: 16px; display: flex; align-items: center; gap: var(--sp-1); }
+  .dot { width: 12px; height: 12px; border-radius: 50%; background: var(--green-600); }
+  .dot.stale { background: var(--red-800); }
   .dot.busy { animation: pulse 1s ease-in-out infinite; }
   @keyframes pulse { 50% { opacity: .3; } }
 
-  .stats { display: flex; gap: 12px; margin: 24px 0 14px; flex-wrap: wrap; }
+  /* 集計 */
+  .stats { display: flex; gap: var(--sp-2); margin: var(--sp-3) 0 var(--sp-2); flex-wrap: wrap; }
   .stat {
-    background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
-    padding: 12px 20px; min-width: 140px; border-top: 4px solid var(--c);
+    border: 1px solid var(--gray-420); border-radius: var(--radius-m); background: var(--white);
+    padding: var(--sp-1) var(--sp-3) var(--sp-2); min-width: 150px; border-top: 6px solid var(--c);
   }
-  .stat b { display: block; font-size: 44px; line-height: 1.1; font-variant-numeric: tabular-nums; }
-  .stat span { color: var(--muted); font-size: 16px; }
+  .stat b { display: block; font-size: 48px; line-height: 1.4; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .stat span { font-size: 17px; font-weight: 700; }
 
-  .bar { display: flex; height: 12px; border-radius: 6px; overflow: hidden; background: var(--line); margin-bottom: 28px; }
+  .bar {
+    display: flex; height: 16px; border-radius: var(--radius-s); overflow: hidden;
+    background: var(--gray-50); border: 1px solid var(--gray-420); margin-bottom: var(--sp-3);
+  }
   .bar div { background: var(--c); transition: flex-grow .6s ease; }
+  .bar div + div { border-left: 2px solid var(--white); }
 
+  /* ノティフィケーションバナー (エラー) */
   .error {
-    display: none; background: #3a1717; border: 1px solid var(--red); color: #ffc9c9;
-    border-radius: 10px; padding: 12px 16px; margin-bottom: 20px; font-size: 15px; white-space: pre-wrap;
+    display: none; border: 2px solid var(--red-800); background: var(--red-50); border-radius: var(--radius-m);
+    padding: var(--sp-2) var(--sp-3); margin-bottom: var(--sp-3);
   }
+  .error strong { color: var(--red-900); display: block; font-size: 18px; }
+  .error pre { margin: var(--sp-1) 0 0; font-family: var(--mono); font-size: 15px; white-space: pre-wrap; }
 
-  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
+  /* カード: 外周 (枠線) をもつ */
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: var(--sp-2); }
   .card {
-    background: var(--panel); border: 1px solid var(--line); border-left: 6px solid var(--c);
-    border-radius: 12px; padding: 16px 18px; min-width: 0;
+    background: var(--white); border: 1px solid var(--gray-420); border-radius: var(--radius-m);
+    padding: var(--sp-2) var(--sp-3); min-width: 0;
   }
-  .card.NO_BRANCH { border-style: dashed; border-left-style: solid; opacity: .55; }
-  .card.flash { animation: flash 1.6s ease-out; }
-  @keyframes flash { 0% { box-shadow: 0 0 0 4px var(--c); transform: scale(1.03); } 100% { box-shadow: 0 0 0 0 transparent; transform: none; } }
-  .card .top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-  .card .id { font-family: var(--mono); font-size: 28px; font-weight: 700; }
-  .pill {
-    font-size: 15px; font-weight: 700; padding: 4px 12px; border-radius: 999px;
-    color: var(--c); background: color-mix(in srgb, var(--c) 16%, transparent); white-space: nowrap;
-  }
-  .card .meta { color: var(--muted); font-size: 15px; margin-top: 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .card .note { color: var(--c); font-size: 15px; margin-top: 6px; overflow-wrap: anywhere; }
+  .card.NO_BRANCH { background: var(--gray-50); border-style: dashed; }
+  .card.flash { animation: flash 2s ease-out; }
+  @keyframes flash { 0% { background: var(--blue-50); outline: 4px solid var(--blue-900); } 100% { outline: 4px solid transparent; } }
+  @media (prefers-reduced-motion: reduce) { .card.flash, .dot.busy { animation: none; } }
+
+  .card .top { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-1); }
+  .card .id { font-family: var(--mono); font-size: 28px; line-height: 1.5; font-weight: 700; }
+  .card .meta { color: var(--gray-600); font-size: 16px; margin-top: var(--sp-1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .card .note { color: var(--red-900); font-size: 16px; font-weight: 700; margin-top: var(--sp-1); overflow-wrap: anywhere; }
   .card pre {
-    display: none; margin: 12px 0 0; padding: 10px 12px; background: var(--bg); border-radius: 8px;
-    font-family: var(--mono); font-size: 15px; white-space: pre-wrap; overflow-wrap: anywhere;
+    display: none; margin: var(--sp-2) 0 0; padding: var(--sp-1) var(--sp-2);
+    background: var(--gray-50); border-radius: var(--radius-s);
+    font-family: var(--mono); font-size: 15px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere;
   }
   body.show-content .card pre:not(:empty) { display: block; }
 
-  .warn { color: var(--amber); font-size: 17px; margin-top: 24px; }
-  .empty { color: var(--muted); font-size: 20px; padding: 40px 0; }
-
-  footer {
-    position: fixed; right: 20px; bottom: 14px; color: var(--gray); font-size: 13px;
+  /* チップラベル: 枠線 + 淡い背景 + 記号 + テキスト (色だけで伝えない) */
+  .chip {
+    display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
+    font-size: 16px; line-height: 1; font-weight: 700; padding: 6px 12px;
+    border: 1px solid var(--chip-line); background: var(--chip-bg); color: var(--chip-text); border-radius: var(--radius-s);
   }
-  kbd { font-family: var(--mono); border: 1px solid var(--line); border-radius: 4px; padding: 0 5px; }
+  .chip .mark { font-family: var(--mono); }
+
+  .warn {
+    margin-top: var(--sp-3); padding: var(--sp-2) var(--sp-3); border: 1px solid var(--orange-600);
+    background: var(--orange-50); border-radius: var(--radius-m); color: var(--orange-900); font-weight: 700;
+  }
+  .warn:empty { display: none; }
+  .empty { color: var(--gray-600); font-size: 20px; padding: var(--sp-5) 0; }
+
+  footer { position: fixed; right: var(--sp-3); bottom: var(--sp-2); color: var(--gray-600); font-size: 14px; background: var(--white); }
+  kbd { font-family: var(--mono); border: 1px solid var(--gray-420); border-radius: 4px; padding: 0 6px; }
 </style>
 </head>
 <body>
   <header>
     <h1>git ハンズオン 進捗</h1>
-    <div class="updated"><span class="dot" id="dot"></span><span id="updated">読み込み中…</span></div>
+    <div class="updated"><span class="dot" id="dot" aria-hidden="true"></span><span id="updated">読み込み中…</span></div>
   </header>
 
   <div class="stats" id="stats"></div>
-  <div class="bar" id="bar"></div>
-  <div class="error" id="error"></div>
+  <div class="bar" id="bar" aria-hidden="true"></div>
+  <div class="error" id="error" role="alert"><strong>取得に失敗しました（前回の結果を表示中）</strong><pre id="error-msg"></pre></div>
   <div class="grid" id="grid"></div>
   <div class="warn" id="warn"></div>
 
@@ -100,22 +134,36 @@
 <script>
   const POLL_MS = 5000;
 
-  // 表示順はこの並び (進んでいる順)
+  // チップラベルの配色 (DADS のチップラベル例: 開始前=グレー / 作業中=青 / 完了=緑 / 保留=黄・橙 / 中止=赤)
+  const TONE = {
+    gray:   { text: "var(--gray-600)",   line: "var(--gray-420)",   bg: "var(--white)",     bar: "var(--gray-420)" },
+    blue:   { text: "var(--blue-900)",   line: "var(--blue-900)",   bg: "var(--blue-50)",   bar: "var(--blue-900)" },
+    orange: { text: "var(--orange-900)", line: "var(--orange-600)", bg: "var(--orange-50)", bar: "var(--orange-600)" },
+    green:  { text: "var(--green-800)",  line: "var(--green-600)",  bg: "var(--green-50)",  bar: "var(--green-600)" },
+    red:    { text: "var(--red-900)",    line: "var(--red-800)",    bg: "var(--red-50)",    bar: "var(--red-800)" },
+  };
   const STATUS = {
-    RESOLVED:     { label: "解決！",           color: "var(--blue)" },
-    INJECTED:     { label: "コンフリクト待ち", color: "var(--amber)" },
-    PUSHED:       { label: "push 済み",        color: "var(--green)" },
-    MARKER_LEFT:  { label: "マーカー残り",     color: "var(--red)" },
-    FORCE_PUSHED: { label: "force push",       color: "var(--red)" },
-    NO_FILE:      { label: "ファイルなし",     color: "var(--red)" },
-    NO_BRANCH:    { label: "未着手",           color: "var(--gray)" },
+    RESOLVED:     { label: "解決",             mark: "✓", tone: "green" },
+    INJECTED:     { label: "コンフリクト対応中", mark: "…", tone: "orange" },
+    PUSHED:       { label: "push 済み",        mark: "↑", tone: "blue" },
+    MARKER_LEFT:  { label: "マーカー残り",     mark: "!", tone: "red" },
+    FORCE_PUSHED: { label: "force push",       mark: "!", tone: "red" },
+    NO_FILE:      { label: "ファイルなし",     mark: "!", tone: "red" },
+    NO_BRANCH:    { label: "未着手",           mark: "–", tone: "gray" },
   };
   const PROBLEMS = ["MARKER_LEFT", "FORCE_PUSHED", "NO_FILE"];
+  // 集計の並び (進んでいる順)。要対応はまとめて 1 つ
+  const GROUPS = [
+    ["RESOLVED", "解決", "green"],
+    ["INJECTED", "コンフリクト対応中", "orange"],
+    ["PUSHED", "push 済み", "blue"],
+    ["PROBLEM", "要対応", "red"],
+    ["NO_BRANCH", "未着手", "gray"],
+  ];
 
   const $ = id => document.getElementById(id);
   const rtf = new Intl.RelativeTimeFormat("ja", { numeric: "auto" });
   let prev = {};
-  let lastData = null;
 
   function ago(unix) {
     if (!unix) return "";
@@ -132,54 +180,53 @@
     return e;
   }
 
+  function chip(st) {
+    const t = TONE[st.tone];
+    const c = el("span", "chip");
+    c.style.setProperty("--chip-text", t.text);
+    c.style.setProperty("--chip-line", t.line);
+    c.style.setProperty("--chip-bg", t.bg);
+    c.append(el("span", "mark", st.mark), st.label);
+    return c;
+  }
+
   function render(data) {
-    lastData = data;
     const rows = data.rows;
 
-    // 集計: 要対応はまとめて 1 つに
     const counts = {};
     for (const r of rows) {
       const k = PROBLEMS.includes(r.status) ? "PROBLEM" : r.status;
       counts[k] = (counts[k] || 0) + 1;
     }
-    const groups = [
-      ["RESOLVED", "解決", "var(--blue)"],
-      ["INJECTED", "コンフリクト待ち", "var(--amber)"],
-      ["PUSHED", "push 済み", "var(--green)"],
-      ["PROBLEM", "要対応", "var(--red)"],
-      ["NO_BRANCH", "未着手", "var(--gray)"],
-    ].filter(([k]) => counts[k] || k === "PUSHED");
+    const groups = GROUPS.filter(([k]) => counts[k] || k === "PUSHED");
 
-    const stat = (n, label, c) => {
+    const stat = (n, label, color) => {
       const s = el("div", "stat");
-      s.style.setProperty("--c", c);
+      s.style.setProperty("--c", color);
       s.append(el("b", null, n), el("span", null, label));
       return s;
     };
     $("stats").replaceChildren(
-      stat(rows.length, "参加者", "var(--text)"),
-      ...groups.map(([k, label, c]) => stat(counts[k] || 0, label, c))
+      stat(rows.length, "参加者", "var(--gray-900)"),
+      ...groups.map(([k, label, tone]) => stat(counts[k] || 0, label, TONE[tone].bar))
     );
-
-    $("bar").replaceChildren(...groups.map(([k, , c]) => {
+    $("bar").replaceChildren(...groups.map(([k, , tone]) => {
       const d = el("div");
-      d.style.setProperty("--c", c);
+      d.style.setProperty("--c", TONE[tone].bar);
       d.style.flexGrow = counts[k] || 0;
       return d;
     }));
 
-    // カード
     if (!rows.length) {
       $("grid").replaceChildren(el("div", "empty", "まだ誰も push していません"));
     } else {
       $("grid").replaceChildren(...rows.map(r => {
-        const st = STATUS[r.status] || { label: r.status, color: "var(--red)" };
+        const st = STATUS[r.status] || { label: r.status, mark: "!", tone: "red" };
         const card = el("div", "card " + r.status);
-        card.style.setProperty("--c", st.color);
         if (prev[r.id] && prev[r.id] !== r.status) card.classList.add("flash");
 
         const top = el("div", "top");
-        top.append(el("span", "id", r.id), el("span", "pill", st.label));
+        top.append(el("span", "id", r.id), chip(st));
         card.append(top);
         if (r.time) card.append(el("div", "meta", `${ago(r.time)} · ${r.subject}`));
         if (r.note && PROBLEMS.includes(r.status)) card.append(el("div", "note", r.note));
@@ -195,7 +242,7 @@
     $("warn").textContent = warn.join("　/　");
 
     $("error").style.display = data.error ? "block" : "none";
-    $("error").textContent = data.error ? "取得に失敗しました（前回の結果を表示中）\n" + data.error : "";
+    $("error-msg").textContent = data.error || "";
     $("dot").classList.toggle("stale", !!data.error);
     $("updated").textContent = new Date(data.updated * 1000).toLocaleTimeString("ja-JP") + " 更新";
   }
