@@ -14,7 +14,9 @@ cd handson-2026-admin
 vi students.txt
 ```
 
-初回実行時に `.work/` へ作業用の clone が作られます。`.work/`、`students.txt`、`injected.tsv` は commit されません。
+スクリプトは置いてあるリポジトリの `origin` を fetch して受講者ブランチを読みます。作業用の clone や記録ファイルは作りません。
+運営が追記したことは Git の内部の参照 `refs/conflict-drill/学籍番号` に記録するので、作業ツリーにはファイルが出ません（`students.txt` は commit されません）。
+運営の追記はチェックアウトせずに直接コミットを作って push するので、手元で開いているブランチや作業中の変更には影響しません。
 
 ## 投影用ページ
 
@@ -78,6 +80,6 @@ PORT=8080 ./serve.sh    # ポートを変える場合
 
 ## 設定
 
-追記する文言や学籍番号の形式は `config.sh` で変えられます。別のリポジトリで試すときは `REPO_URL=/path/to/repo.git ./monitor.sh` のように実行します。
+追記する文言や学籍番号の形式は `config.sh` で変えられます。別のリポジトリで試すときは、そのリポジトリを clone してスクリプトを置いて実行します。
 
 `inject-conflict.sh` は仕込み済みのブランチを飛ばすので、何度実行しても大丈夫です。自動モードを止めていた間に push した人がいたら、`./inject-conflict.sh` を一度実行してください。

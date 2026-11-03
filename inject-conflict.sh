@@ -25,17 +25,27 @@ watching=0
 n_done=0
 skip() { [ $watching = 1 ] || echo "$1"; }
 
-# 作業用 clone のファイル $1 の一番下に INJECT_LINE を追記する (改行コードはファイルに合わせる)
-append_line() {
-  local f="$WORK_DIR/$1" eol=$'\n'
-  [ "$(tail -c 2 "$f" | od -An -c | tr -d ' ')" = '\r\n' ] && eol=$'\r\n'
-  # 最終行に改行がなければ先に改行する
-  [ -n "$(tail -c 1 "$f")" ] && printf '%s' "$eol" >> "$f"
-  printf '%s%s' "$INJECT_LINE" "$eol" >> "$f"
+# ブランチ $1 (ref) のファイル $2 の一番下に INJECT_LINE を追記した版を Git に書き込み、その blob を出す
+# (改行コードはファイルに合わせる。作業ツリーには何も書かない)
+appended_blob() {
+  local obj="$1:$2" eol=$'\n'
+  [ "$(g cat-file blob "$obj" | tail -c 2 | od -An -c | tr -d ' ')" = '\r\n' ] && eol=$'\r\n'
+  {
+    g cat-file blob "$obj"
+    # 最終行に改行がなければ先に改行する
+    [ -n "$(g cat-file blob "$obj" | tail -c 1)" ] && printf '%s' "$eol"
+    printf '%s%s' "$INJECT_LINE" "$eol"
+  } | g hash-object -w --no-filters --stdin
+}
+
+# ブランチ $1 (ref) の一番上のツリーで、ファイル $2 だけを blob $3 に差し替えたツリーを作る
+replaced_tree() {
+  g ls-tree -z "$1" | awk -v f="$2" -v b="$3" 'BEGIN { RS = ORS = "\0"; FS = OFS = "\t" }
+    $2 == f { split($1, m, " "); $1 = m[1] " " m[2] " " b } { print }' | g mktree -z
 }
 
 inject() {
-  local id=$1 branch ref file
+  local id=$1 branch ref file blob tree commit
   branch=$(branch_of "$id")
   if [ -z "$branch" ]; then
     skip "${C_DIM}skip $id: ブランチなし${C_RST}"; return
@@ -53,12 +63,14 @@ inject() {
     echo "${C_CYN}would inject $id: $branch/$file に追記${C_RST}"; return
   fi
 
-  # 大文字小文字だけ違うブランチ名がぶつからないよう、ローカルブランチは作らない
-  g checkout --quiet --detach "$ref" || return
-  append_line "$file"
-  g commit --quiet -am "運営: $file の一番下に追記しました ${INJECT_TAG}"
-  if g push --quiet origin "HEAD:refs/heads/$branch"; then
-    printf '%s\t%s\n' "$id" "$(g rev-parse HEAD)" >> "$INJECTED_LOG"
+  # チェックアウトせずにコミットを作り、そのまま origin のブランチへ push する
+  blob=$(appended_blob "$ref" "$file") &&
+    tree=$(replaced_tree "$ref" "$file" "$blob") &&
+    commit=$(g commit-tree "$tree" -p "$ref" -m "運営: $file の一番下に追記しました ${INJECT_TAG}") || {
+    echo "${C_RED}コミット作成失敗 $id${C_RST}"; return
+  }
+  if g push --quiet origin "$commit:refs/heads/$branch"; then
+    g update-ref "$INJECTED_REFS/$id" "$commit"
     echo "${C_GRN}$(date '+%H:%M:%S') injected $id ($file)${C_RST}"
     n_done=$((n_done + 1))
   else
@@ -71,13 +83,13 @@ if [ "$interval" -gt 0 ] 2>/dev/null; then
   watching=1
   echo "新しく push されたファイルを ${interval} 秒ごとに探しています (Ctrl+C で終了)"
   while true; do
-    sync_work
+    fetch_remote
     for id in $(all_ids); do inject "$id"; done
     sleep "$interval"
   done
 fi
 
-sync_work
+fetch_remote
 if [ $# -gt 0 ]; then
   ids=$(printf '%s\n' "$@" | upper)
 else
@@ -85,5 +97,4 @@ else
 fi
 for id in $ids; do inject "$id"; done
 
-g checkout --quiet --detach 2>/dev/null
 echo "完了: $n_done 件"

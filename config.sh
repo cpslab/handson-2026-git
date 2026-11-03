@@ -1,7 +1,8 @@
 # 運営スクリプト共通の設定。monitor.sh / inject-conflict.sh から source される。
 
-# 監視対象のリポジトリ (環境変数 REPO_URL で上書き可)
-REPO_URL="${REPO_URL:-git@github.com:cpslab/handson-2026-git.git}"
+# 監視対象は、このスクリプトを置いているリポジトリの origin。
+# 作業用の clone や記録ファイルは作らず、このリポジトリの origin/* を fetch して読む。
+# 運営が追記したことは Git の内部の参照 refs/conflict-drill/学籍番号 に記録する (作業ツリーにファイルは出ない)
 
 # 学籍番号の形式: 2xFIxxx / 2xFMIxxx (x の前半は 3-6、後半は 3 桁)
 ID_REGEX='^2[3-6]FM?I[0-9]{3}$'
@@ -15,9 +16,7 @@ INJECT_TAG='[conflict-drill]'
 IGNORE_BRANCHES='^(main|admin|HEAD)$'
 
 ADMIN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-WORK_DIR="$ADMIN_DIR/.work"          # 作業用 clone (gitignore 済み)
 ROSTER="$ADMIN_DIR/students.txt"     # 名簿 (任意・gitignore 済み)
-INJECTED_LOG="$ADMIN_DIR/injected.tsv" # 書き換えた記録 (gitignore 済み)
 
 if [ -t 1 ]; then
   C_RED=$'\e[31m'; C_GRN=$'\e[32m'; C_YEL=$'\e[33m'; C_CYN=$'\e[36m'; C_DIM=$'\e[2m'; C_RST=$'\e[0m'
@@ -25,15 +24,10 @@ else
   C_RED=; C_GRN=; C_YEL=; C_CYN=; C_DIM=; C_RST=
 fi
 
-g() { git -C "$WORK_DIR" "$@"; }
+g() { git -C "$ADMIN_DIR" "$@"; }
 
-# 作業用 clone を用意して最新化する
-sync_work() {
-  if [ ! -d "$WORK_DIR/.git" ]; then
-    git clone --quiet --no-checkout "$REPO_URL" "$WORK_DIR" || exit 1
-  fi
-  g fetch --quiet --prune origin || exit 1
-}
+# origin の受講者ブランチを最新化する
+fetch_remote() { g fetch --quiet --prune origin || exit 1; }
 
 # 学籍番号のブランチ名・ファイル名は大文字小文字を区別しない (24fi001 も 24FI001 として扱う)
 # 一覧や記録では大文字にそろえた学籍番号を使う
@@ -71,4 +65,6 @@ inject_commit() {
   g log --format=%H -1 --fixed-strings --grep="$INJECT_TAG" "$1" 2>/dev/null
 }
 
-was_injected() { [ -f "$INJECTED_LOG" ] && grep -q "^$1	" "$INJECTED_LOG"; }
+# 運営が追記したコミットの記録
+INJECTED_REFS=refs/conflict-drill
+was_injected() { g rev-parse -q --verify "$INJECTED_REFS/$1" >/dev/null; }

@@ -25,7 +25,7 @@ done
 #   row SEP id SEP status SEP author SEP 時刻(unix) SEP 時刻(相対) SEP 件名 SEP 補足 SEP 中身
 # 最後に形式外のブランチ (odd) と名簿にないブランチ (extra) を 1 行ずつ出力する
 collect() {
-  sync_work
+  fetch_remote
 
   for id in $(all_ids); do
     local branch ref file status note="" author="" ct="" ar="" subject="" content=""
@@ -99,7 +99,7 @@ report() {
 
   local n_total=0 n_branch=0 n_pushed=0 n_injected=0 n_resolved=0 n_problem=0 odd="" extra=""
 
-  printf '%s\n' "${C_DIM}$(date '+%H:%M:%S') 更新 / $REPO_URL${C_RST}"
+  printf '%s\n' "${C_DIM}$(date '+%H:%M:%S') 更新 / $(g remote get-url origin)${C_RST}"
   printf '%-10s %-14s %s\n' "ID" "STATUS" "最新コミット"
   printf '%s\n' "------------------------------------------------------------------"
 
