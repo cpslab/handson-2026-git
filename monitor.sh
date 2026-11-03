@@ -4,91 +4,116 @@
 #   ./monitor.sh          一覧を 1 回表示
 #   ./monitor.sh -c       各自の 学籍番号.md の中身も表示
 #   ./monitor.sh -w 10    10 秒ごとに更新し続ける (Ctrl+C で終了)
+#   ./monitor.sh -t       機械向けの出力 (server.py が使う)
 set -u
 . "$(dirname "$0")/config.sh"
 
+SEP=$'\x1f'
 show_content=0
 interval=0
-while getopts "cw:" opt; do
+machine=0
+while getopts "cw:t" opt; do
   case $opt in
     c) show_content=1 ;;
     w) interval=$OPTARG ;;
-    *) sed -n '2,7p' "$0"; exit 1 ;;
+    t) machine=1 ;;
+    *) sed -n '2,8p' "$0"; exit 1 ;;
   esac
 done
 
-report() {
+# 1 人 1 行で状態を出力する。区切りは \x1f、ファイルの中身は base64
+#   row SEP id SEP status SEP author SEP 時刻(unix) SEP 時刻(相対) SEP 件名 SEP 補足 SEP 中身
+# 最後に形式外のブランチ (odd) と名簿にないブランチ (extra) を 1 行ずつ出力する
+collect() {
   sync_work
 
-  local ids n_total=0 n_pushed=0 n_injected=0 n_resolved=0 n_problem=0
-  ids=$(all_ids)
+  for id in $(all_ids); do
+    local ref="origin/$id" file="$id.md" status note="" author="" ct="" ar="" subject="" content=""
+
+    if ! has_ref "$id"; then
+      status="NO_BRANCH"
+    else
+      IFS=$SEP read -r author ct ar subject < <(g log -1 --format="%an${SEP}%ct${SEP}%ar${SEP}%s" "$ref")
+      local inject
+      inject=$(inject_commit "$id")
+
+      if ! g cat-file -e "$ref:$file" 2>/dev/null; then
+        status="NO_FILE"
+        note=$(g ls-tree --name-only "$ref" | grep -v '^README.md$' | tr '\n' ' ')
+        [ -n "$note" ] && note="ファイル: $note"
+      else
+        content=$(g show "$ref:$file" | base64 -w0)
+        if g show "$ref:$file" | grep -Eq '^(<<<<<<<|=======|>>>>>>>)'; then
+          status="MARKER_LEFT"; note="コンフリクトマーカーが残ったまま push"
+        elif [ -z "$inject" ] && was_injected "$id"; then
+          status="FORCE_PUSHED"; note="運営のコミットが履歴から消えている (push -f ?)"
+        elif [ -z "$inject" ]; then
+          status="PUSHED"
+        elif [ "$(g rev-parse "$ref")" = "$inject" ]; then
+          status="INJECTED"; note="受講者の対応待ち"
+        elif [ -n "$(g rev-list --merges "$inject..$ref")" ]; then
+          status="RESOLVED"; note="merge で解決"
+        else
+          status="RESOLVED"; note="merge コミットなし (rebase か、pull 後に編集)"
+        fi
+      fi
+    fi
+
+    printf '%s\n' "row$SEP$id$SEP$status$SEP$author$SEP$ct$SEP$ar$SEP${subject//$'\t'/ }$SEP$note$SEP$content"
+  done
+
+  printf 'odd%s%s\n' "$SEP" "$(remote_branches | grep -Ev "$ID_REGEX" | tr '\n' ' ')"
+  local extra=""
+  [ -f "$ROSTER" ] && extra=$(remote_branches | grep -E "$ID_REGEX" | grep -vxFf <(tr -d '\r' < "$ROSTER") | tr '\n' ' ')
+  printf 'extra%s%s\n' "$SEP" "$extra"
+}
+
+report() {
+  local data
+  data=$(collect) || return 1
+
+  local n_total=0 n_pushed=0 n_injected=0 n_resolved=0 n_problem=0 odd="" extra=""
 
   printf '%s\n' "${C_DIM}$(date '+%H:%M:%S') 更新 / $REPO_URL${C_RST}"
   printf '%-10s %-14s %s\n' "ID" "STATUS" "最新コミット"
   printf '%s\n' "------------------------------------------------------------------"
 
-  for id in $ids; do
+  while IFS=$SEP read -r kind id status author ct ar subject note content; do
+    case $kind in
+      odd) odd=$id; continue ;;
+      extra) extra=$id; continue ;;
+    esac
+
+    local color last=""
     n_total=$((n_total + 1))
-    local ref="origin/$id" file="$id.md" status color note="" last=""
-
-    if ! has_ref "$id"; then
-      status="NO_BRANCH"; color=$C_DIM
-    else
-      last=$(g log -1 --format='%an, %ar: %s' "$ref")
-      local inject
-      inject=$(inject_commit "$id")
-
-      if ! g cat-file -e "$ref:$file" 2>/dev/null; then
-        status="NO_FILE"; color=$C_RED; n_problem=$((n_problem + 1))
-        note=$(g ls-tree --name-only "$ref" | grep -v '^README.md$' | tr '\n' ' ')
-        [ -n "$note" ] && note="ファイル: $note"
-      elif g show "$ref:$file" | grep -Eq '^(<<<<<<<|=======|>>>>>>>)'; then
-        status="MARKER_LEFT"; color=$C_RED; n_problem=$((n_problem + 1))
-        note="コンフリクトマーカーが残ったまま push"
-      elif [ -z "$inject" ] && was_injected "$id"; then
-        status="FORCE_PUSHED"; color=$C_RED; n_problem=$((n_problem + 1))
-        note="運営のコミットが履歴から消えている (push -f ?)"
-      elif [ -z "$inject" ]; then
-        status="PUSHED"; color=$C_GRN; n_pushed=$((n_pushed + 1))
-      elif [ "$(g rev-parse "$ref")" = "$inject" ]; then
-        status="INJECTED"; color=$C_YEL; n_injected=$((n_injected + 1))
-        note="受講者の対応待ち"
-      else
-        status="RESOLVED"; color=$C_CYN; n_resolved=$((n_resolved + 1))
-        if [ -n "$(g rev-list --merges "$inject..$ref")" ]; then
-          note="merge で解決"
-        else
-          note="merge コミットなし (rebase か、pull 後に編集)"
-        fi
-      fi
-    fi
+    case $status in
+      NO_BRANCH) color=$C_DIM ;;
+      PUSHED) color=$C_GRN; n_pushed=$((n_pushed + 1)) ;;
+      INJECTED) color=$C_YEL; n_injected=$((n_injected + 1)) ;;
+      RESOLVED) color=$C_CYN; n_resolved=$((n_resolved + 1)) ;;
+      *) color=$C_RED; n_problem=$((n_problem + 1)) ;;
+    esac
+    [ -n "$author" ] && last="$author, $ar: $subject"
 
     printf '%s%-10s %-14s%s %s\n' "$color" "$id" "$status" "$C_RST" "$last"
     [ -n "$note" ] && printf '%-25s %s\n' "" "${C_DIM}↳ $note${C_RST}"
-
-    if [ $show_content = 1 ] && has_ref "$id" && g cat-file -e "$ref:$file" 2>/dev/null; then
-      g show "$ref:$file" | sed 's/^/    │ /'
+    if [ $show_content = 1 ] && [ -n "$content" ]; then
+      base64 -d <<< "$content" | sed 's/^/    │ /'
     fi
-  done
+  done <<< "$data"
 
   printf '%s\n' "------------------------------------------------------------------"
   printf '全 %d 人 / push 済み %d / 書き換え済み %d / 解決 %d / 要対応 %s%d%s\n' \
     "$n_total" "$n_pushed" "$n_injected" "$n_resolved" "$C_RED" "$n_problem" "$C_RST"
-
   # 学籍番号の形式に合わないブランチ (打ち間違いの可能性)
-  local odd
-  odd=$(remote_branches | grep -Ev "$ID_REGEX" | tr '\n' ' ')
   [ -n "$odd" ] && printf '%s形式外のブランチ: %s%s\n' "$C_YEL" "$odd" "$C_RST"
-  # 名簿にない学籍番号 (名簿がある場合のみ)
-  if [ -f "$ROSTER" ]; then
-    local extra
-    extra=$(remote_branches | grep -E "$ID_REGEX" | grep -vxFf <(tr -d '\r' < "$ROSTER") | tr '\n' ' ')
-    [ -n "$extra" ] && printf '%s名簿にないブランチ: %s%s\n' "$C_YEL" "$extra" "$C_RST"
-  fi
+  [ -n "$extra" ] && printf '%s名簿にないブランチ: %s%s\n' "$C_YEL" "$extra" "$C_RST"
   return 0
 }
 
-if [ "$interval" -gt 0 ] 2>/dev/null; then
+if [ $machine = 1 ]; then
+  collect
+elif [ "$interval" -gt 0 ] 2>/dev/null; then
   while true; do
     out=$(report)
     clear

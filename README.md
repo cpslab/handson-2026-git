@@ -16,6 +16,16 @@ vi students.txt
 
 初回実行時に `.work/` へ作業用の clone が作られます。`.work/`、`students.txt`、`injected.tsv` は commit されません。
 
+## 投影用ページ
+
+```bash
+./serve.sh              # http://localhost:8000 を開く
+PORT=8080 ./serve.sh    # ポートを変える場合
+```
+
+5 秒ごとに自動で更新され、状態が変わったカードは光ります。`C` キーで各自のファイルの中身、`F` キーで全画面表示を切り替えます。
+判定は `monitor.sh` と同じです。Python 3 が必要です（標準ライブラリのみ）。サーバーは自分の PC からしか開けません（127.0.0.1 で待ち受け）。
+
 ## 受講者に配るテンプレート
 
 ファイル名は `学籍番号.md`（例: `24FI001.md`）。「ひとこと:」の行がコンフリクト演習で使われます。
@@ -29,7 +39,7 @@ vi students.txt
 ## 当日の流れ
 
 1. 受講者: 学籍番号のブランチを切り、`学籍番号.md` を add / commit / push する
-2. 運営: `./monitor.sh -w 10` で全員の push を確認する（`-c` を付けると中身も出る）
+2. 運営: `./serve.sh` のページを投影して全員の push を確認する（ターミナルなら `./monitor.sh -w 10`）
 3. 運営: `./inject-conflict.sh -n` で対象を確認し、`./inject-conflict.sh` で仕込む
 4. 受講者: **pull はせずに** 「ひとこと」を書き換えて commit → push する
 5. 受講者: push が reject される → `git pull --no-rebase` → コンフリクト → 解決して commit → push
