@@ -10,19 +10,37 @@
 #   ./inject-conflict.sh -n            何をするかだけ表示 (dry run)
 #   ./inject-conflict.sh               まだ仕込んでいない全員に仕込む
 #   ./inject-conflict.sh 24FI001 ...   指定した学籍番号に仕込む (仕込み済みでももう一度)
+#   ./inject-conflict.sh -r            仕込んだ記録を全員分消す (練習の後、本番の前に)
+#   ./inject-conflict.sh -r 24FI001    指定した学籍番号の記録だけ消す (ブランチを作り直した人など)
 set -u
 . "$(dirname "$0")/config.sh"
 
 dry_run=0
 interval=0
-while getopts "nw:" opt; do
+reset=0
+while getopts "nw:r" opt; do
   case $opt in
     n) dry_run=1 ;;
     w) interval=$OPTARG ;;
-    *) sed -n '2,12p' "$0"; exit 1 ;;
+    r) reset=1 ;;
+    *) sed -n '2,14p' "$0"; exit 1 ;;
   esac
 done
 shift $((OPTIND - 1))
+
+# 記録を消すと、その人は「まだ仕込んでいない」扱いに戻る。
+# ただしブランチの履歴に運営のコミットが残っている人は、引き続き仕込み済みとして飛ばす
+if [ $reset = 1 ]; then
+  if [ $# -gt 0 ]; then
+    refs=$(printf "$INJECTED_REFS/%s\n" $(printf '%s\n' "$@" | upper))
+  else
+    refs=$(g for-each-ref --format='%(refname)' "$INJECTED_REFS")
+  fi
+  for r in $refs; do
+    g update-ref -d "$r" 2>/dev/null && echo "記録を消しました: ${r##*/}"
+  done
+  exit 0
+fi
 
 watching=0
 n_done=0
