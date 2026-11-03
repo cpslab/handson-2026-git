@@ -42,7 +42,7 @@ collect() {
 
       if [ -z "$file" ]; then
         status="NO_FILE"
-        note=$(g ls-tree --name-only "$ref" | grep -v '^README.md$' | tr '\n' ' ')
+        note=$(g ls-tree --name-only "$ref" | grep -Ev '^(README|template)\.md$' | tr '\n' ' ')
         [ -n "$note" ] && note="ファイル: $note"
       else
         content=$(g show "$ref:$file" | base64 -w0)
