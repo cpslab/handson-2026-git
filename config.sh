@@ -37,23 +37,40 @@ sync_work() {
   g fetch --quiet --prune origin || exit 1
 }
 
+# 学籍番号のブランチ名・ファイル名は大文字小文字を区別しない (24fi001 も 24FI001 として扱う)
+# 一覧や記録では大文字にそろえた学籍番号を使う
+upper() { tr '[:lower:]' '[:upper:]'; }
+
+# 新しく更新された順
 remote_branches() {
-  g for-each-ref --format='%(refname:lstrip=3)' refs/remotes/origin | grep -Ev "$IGNORE_BRANCHES"
+  g for-each-ref --sort=-committerdate --format='%(refname:lstrip=3)' refs/remotes/origin | grep -Ev "$IGNORE_BRANCHES"
 }
 
-# 名簿の学籍番号 + リモートにある学籍番号形式のブランチ (重複なし)
+roster_ids() {
+  [ -f "$ROSTER" ] && tr -d '\r' < "$ROSTER" | upper | grep -E "$ID_REGEX"
+}
+
+# 名簿の学籍番号 + リモートにある学籍番号形式のブランチ (大文字にそろえて重複なし)
 all_ids() {
   {
-    [ -f "$ROSTER" ] && tr -d '\r' < "$ROSTER" | grep -E "$ID_REGEX"
-    remote_branches | grep -E "$ID_REGEX"
+    roster_ids
+    remote_branches | grep -Ei "$ID_REGEX" | upper
   } | sort -u
 }
 
-has_ref() { g rev-parse -q --verify "origin/$1" >/dev/null; }
+# 標準入力から $1 と大文字小文字を無視して一致する行を出す
+# (Git Bash の grep は -i と -F を一緒に使うと異常終了するため awk で比べる)
+match_i() { awk -v k="$1" 'tolower($0) == tolower(k)'; }
 
-# 運営が書き換えたコミット (ブランチの履歴から探す)
+# 学籍番号に対応するリモートのブランチ名。大文字小文字違いで複数あれば最後に更新されたもの
+branch_of() { remote_branches | match_i "$1" | head -1; }
+
+# ブランチ ($1 = ref) にある 学籍番号.md のファイル名
+file_of() { g ls-tree --name-only "$1" | match_i "$2.md" | head -1; }
+
+# 運営が書き換えたコミット (ブランチ $1 = ref の履歴から探す)
 inject_commit() {
-  g log --format=%H -1 --fixed-strings --grep="$INJECT_TAG" "origin/$1" 2>/dev/null
+  g log --format=%H -1 --fixed-strings --grep="$INJECT_TAG" "$1" 2>/dev/null
 }
 
 was_injected() { [ -f "$INJECTED_LOG" ] && grep -q "^$1	" "$INJECTED_LOG"; }

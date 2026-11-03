@@ -19,7 +19,7 @@ shift $((OPTIND - 1))
 sync_work
 
 if [ $# -gt 0 ]; then
-  ids="$*"
+  ids=$(printf '%s\n' "$@" | upper)
 else
   ids=$(all_ids)
 fi
@@ -28,32 +28,35 @@ key_pattern="^${TARGET_KEY}(:|：)"
 n_done=0
 
 for id in $ids; do
-  file="$id.md"
-  if ! has_ref "$id"; then
+  branch=$(branch_of "$id")
+  if [ -z "$branch" ]; then
     echo "${C_DIM}skip $id: ブランチなし${C_RST}"; continue
   fi
-  if ! g cat-file -e "origin/$id:$file" 2>/dev/null; then
-    echo "${C_YEL}skip $id: $file がない${C_RST}"; continue
+  ref="origin/$branch"
+  file=$(file_of "$ref" "$id")
+  if [ -z "$file" ]; then
+    echo "${C_YEL}skip $id: $id.md がない${C_RST}"; continue
   fi
-  if [ -n "$(inject_commit "$id")" ]; then
+  if [ -n "$(inject_commit "$ref")" ]; then
     echo "${C_DIM}skip $id: 書き換え済み${C_RST}"; continue
   fi
-  if ! g show "origin/$id:$file" | grep -Eq "$key_pattern"; then
+  if ! g show "$ref:$file" | grep -Eq "$key_pattern"; then
     echo "${C_YEL}skip $id: 「${TARGET_KEY}:」の行がない${C_RST}"; continue
   fi
 
   if [ $dry_run = 1 ]; then
-    echo "${C_CYN}would inject $id${C_RST}"; continue
+    echo "${C_CYN}would inject $id ($branch/$file)${C_RST}"; continue
   fi
 
-  g checkout --quiet -B "$id" "origin/$id" || continue
+  # 大文字小文字だけ違うブランチ名がぶつからないよう、ローカルブランチは作らない
+  g checkout --quiet --detach "$ref" || continue
   # 改行コード (CRLF) を壊さないよう行末の \r は残す
   sed -i -E "s/(${key_pattern})[^\r]*/\1 ${INJECT_TEXT}/" "$WORK_DIR/$file"
   if g diff --quiet; then
     echo "${C_YEL}skip $id: すでに同じ文言${C_RST}"; continue
   fi
   g commit --quiet -am "運営: ${TARGET_KEY} を書き換えました ${INJECT_TAG}"
-  if g push --quiet origin "HEAD:refs/heads/$id"; then
+  if g push --quiet origin "HEAD:refs/heads/$branch"; then
     printf '%s\t%s\n' "$id" "$(g rev-parse HEAD)" >> "$INJECTED_LOG"
     echo "${C_GRN}injected $id${C_RST}"
     n_done=$((n_done + 1))

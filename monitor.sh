@@ -28,16 +28,19 @@ collect() {
   sync_work
 
   for id in $(all_ids); do
-    local ref="origin/$id" file="$id.md" status note="" author="" ct="" ar="" subject="" content=""
+    local branch ref file status note="" author="" ct="" ar="" subject="" content=""
+    branch=$(branch_of "$id")
 
-    if ! has_ref "$id"; then
+    if [ -z "$branch" ]; then
       status="NO_BRANCH"
     else
+      ref="origin/$branch"
+      file=$(file_of "$ref" "$id")
       IFS=$SEP read -r author ct ar subject < <(g log -1 --format="%an${SEP}%ct${SEP}%ar${SEP}%s" "$ref")
       local inject
-      inject=$(inject_commit "$id")
+      inject=$(inject_commit "$ref")
 
-      if ! g cat-file -e "$ref:$file" 2>/dev/null; then
+      if [ -z "$file" ]; then
         status="NO_FILE"
         note=$(g ls-tree --name-only "$ref" | grep -v '^README.md$' | tr '\n' ' ')
         [ -n "$note" ] && note="ファイル: $note"
@@ -57,14 +60,18 @@ collect() {
           status="RESOLVED"; note="merge コミットなし (rebase か、pull 後に編集)"
         fi
       fi
+
+      local same
+      same=$(remote_branches | match_i "$id" | tr '\n' ' ')
+      [ "${same% }" != "$branch" ] && note="${note:+$note / }同じ学籍番号のブランチが複数: ${same}($branch を表示)"
     fi
 
     printf '%s\n' "row$SEP$id$SEP$status$SEP$author$SEP$ct$SEP$ar$SEP${subject//$'\t'/ }$SEP$note$SEP$content"
   done
 
-  printf 'odd%s%s\n' "$SEP" "$(remote_branches | grep -Ev "$ID_REGEX" | tr '\n' ' ')"
+  printf 'odd%s%s\n' "$SEP" "$(remote_branches | grep -Eiv "$ID_REGEX" | sort | tr '\n' ' ')"
   local extra=""
-  [ -f "$ROSTER" ] && extra=$(remote_branches | grep -E "$ID_REGEX" | grep -vxFf <(tr -d '\r' < "$ROSTER") | tr '\n' ' ')
+  [ -f "$ROSTER" ] && extra=$(remote_branches | grep -Ei "$ID_REGEX" | upper | sort -u | grep -vxFf <(roster_ids) | tr '\n' ' ')
   printf 'extra%s%s\n' "$SEP" "$extra"
 }
 
