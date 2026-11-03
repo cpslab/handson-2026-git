@@ -51,7 +51,7 @@ PORT=8080 ./serve.sh    # ポートを変える場合
 事前に運営は `./inject-conflict.sh -w 5` と `./serve.sh` を起動しておきます。
 
 1. 受講者: 学籍番号のブランチを切り、`学籍番号.md` を add → commit → push する（最初の push は成功する）
-2. 運営（自動）: `inject-conflict.sh -w` が push されたファイルを見つけ、一番下に運営の 1 行（`config.sh` の `INJECT_LINE`）を追記して push する
+2. 運営（自動）: `inject-conflict.sh -w` が push されたファイルを見つけ、一番下に運営の 1 行（`config.sh` の `INJECT_LINE`）を追記して push する。仕込むのは最初の push の 1 回だけで、解決した後や force push された後にもう一度仕込むことはない
 3. 受講者: **ファイルの一番下に** 1 行追加して（例: `- 最近のマイブーム: 〇〇`）add → commit → push → **reject される**
 4. 受講者: `git pull --no-rebase` → コンフリクト → 解決して commit → push
 5. 運営: 投影ページで全員が「解決」になったか確認する
@@ -82,4 +82,11 @@ PORT=8080 ./serve.sh    # ポートを変える場合
 
 追記する文言や学籍番号の形式は `config.sh` で変えられます。別のリポジトリで試すときは、そのリポジトリを clone してスクリプトを置いて実行します。
 
-`inject-conflict.sh` は仕込み済みのブランチを飛ばすので、何度実行しても大丈夫です。自動モードを止めていた間に push した人がいたら、`./inject-conflict.sh` を一度実行してください。
+`inject-conflict.sh` の自動モード（`-w`）と引数なしの一括実行は、一度仕込んだ人を飛ばすので何度実行しても大丈夫です。自動モードを止めていた間に push した人がいたら、`./inject-conflict.sh` を一度実行してください。
+
+特定の人にもう一度コンフリクトを起こしたいときは、学籍番号を指定して実行します。仕込み済みでも、もう一度一番下に追記します。その人には pull せずに一番下に 1 行追加して push してもらってください。
+
+```bash
+./inject-conflict.sh 24FI001          # 1 人
+./inject-conflict.sh 24FI001 24FI002  # 複数人
+```

@@ -3,10 +3,13 @@
 # コンフリクトの種を仕込む。受講者が指示どおりファイルの一番下に 1 行追加して push すると、
 # 同じ場所に両方が追記したことになりコンフリクトする。
 #
+# 自動モードと一括実行は、最初の push に 1 人 1 回だけ仕込む (一度仕込んだ人には二度と仕込まない)。
+# 学籍番号を指定したときは、仕込み済みでももう一度追記してコンフリクトを起こす。
+#
 #   ./inject-conflict.sh -w 5          5 秒ごとに新しく push されたファイルを探して仕込み続ける (Ctrl+C で終了)
 #   ./inject-conflict.sh -n            何をするかだけ表示 (dry run)
-#   ./inject-conflict.sh               対象の全ブランチに仕込む
-#   ./inject-conflict.sh 24FI001 ...   指定した学籍番号だけに仕込む
+#   ./inject-conflict.sh               まだ仕込んでいない全員に仕込む
+#   ./inject-conflict.sh 24FI001 ...   指定した学籍番号に仕込む (仕込み済みでももう一度)
 set -u
 . "$(dirname "$0")/config.sh"
 
@@ -16,7 +19,7 @@ while getopts "nw:" opt; do
   case $opt in
     n) dry_run=1 ;;
     w) interval=$OPTARG ;;
-    *) sed -n '2,9p' "$0"; exit 1 ;;
+    *) sed -n '2,12p' "$0"; exit 1 ;;
   esac
 done
 shift $((OPTIND - 1))
@@ -44,15 +47,16 @@ replaced_tree() {
     $2 == f { split($1, m, " "); $1 = m[1] " " m[2] " " b } { print }' | g mktree -z
 }
 
+# 学籍番号 $1 のブランチに仕込む。$2 が again なら仕込み済みでももう一度仕込む
 inject() {
-  local id=$1 branch ref file blob tree commit
+  local id=$1 again=${2:-} branch ref file blob tree commit
   branch=$(branch_of "$id")
   if [ -z "$branch" ]; then
     skip "${C_DIM}skip $id: ブランチなし${C_RST}"; return
   fi
   ref="origin/$branch"
-  if [ -n "$(inject_commit "$ref")" ]; then
-    skip "${C_DIM}skip $id: 仕込み済み${C_RST}"; return
+  if [ "$again" != again ] && { was_injected "$id" || [ -n "$(inject_commit "$ref")" ]; }; then
+    skip "${C_DIM}skip $id: 仕込み済み (もう一度なら ./inject-conflict.sh $id)${C_RST}"; return
   fi
   file=$(file_of "$ref" "$id")
   if [ -z "$file" ]; then
@@ -91,10 +95,9 @@ fi
 
 fetch_remote
 if [ $# -gt 0 ]; then
-  ids=$(printf '%s\n' "$@" | upper)
+  for id in $(printf '%s\n' "$@" | upper); do inject "$id" again; done
 else
-  ids=$(all_ids)
+  for id in $(all_ids); do inject "$id"; done
 fi
-for id in $ids; do inject "$id"; done
 
 echo "完了: $n_done 件"
