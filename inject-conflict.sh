@@ -105,13 +105,19 @@ if [ "$interval" -gt 0 ] 2>/dev/null; then
   watching=1
   echo "新しく push されたファイルを ${interval} 秒ごとに探しています (Ctrl+C で終了)"
   while true; do
-    fetch_remote
-    for id in $(all_ids); do inject "$id"; done
+    # serve.sh から起動されたときは、serve.sh が終わったら一緒に終わる
+    if [ -n "${WATCH_PARENT:-}" ] && ! kill -0 "$WATCH_PARENT" 2>/dev/null; then exit 0; fi
+    # ネットワークが一瞬切れても止まらず、次の回に再試行する
+    if fetch_remote; then
+      for id in $(all_ids); do inject "$id"; done
+    else
+      echo "${C_RED}$(date '+%H:%M:%S') fetch に失敗しました。${interval} 秒後に再試行します${C_RST}"
+    fi
     sleep "$interval"
   done
 fi
 
-fetch_remote
+fetch_remote || exit 1
 if [ $# -gt 0 ]; then
   for id in $(printf '%s\n' "$@" | upper); do inject "$id" again; done
 else

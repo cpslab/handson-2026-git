@@ -18,12 +18,17 @@ vi students.txt
 運営が追記したことは Git の内部の参照 `refs/conflict-drill/学籍番号` に記録するので、作業ツリーにはファイルが出ません（`students.txt` は commit されません）。
 運営の追記はチェックアウトせずに直接コミットを作って push するので、手元で開いているブランチや作業中の変更には影響しません。
 
-## 投影用ページ
+## 投影用ページと自動の仕込み
 
 ```bash
-./serve.sh              # http://localhost:8000 を開く
-PORT=8080 ./serve.sh    # ポートを変える場合
+./serve.sh                     # http://localhost:8000 を開く。コンフリクトの自動仕込みも一緒に動く
+PORT=8080 ./serve.sh           # ポートを変える場合
+INJECT_INTERVAL=10 ./serve.sh  # 自動仕込みの間隔を変える場合 (秒、既定 5)
+AUTO_INJECT=0 ./serve.sh       # 自動仕込みを動かさず、ページだけ出す場合
 ```
+
+`serve.sh` を起動しておけば、`inject-conflict.sh -w` を別に起動する必要はありません。仕込んだときはこの画面に `injected 学籍番号` と表示されます。Ctrl+C で両方止まります。
+fetch は自動仕込み側だけが行い（同時に fetch してぶつからないように）、ネットワークが一瞬切れても止まらずに次の回で再試行します。
 
 5 秒ごとに自動で更新され、状態が変わったカードは光ります。
 
@@ -48,10 +53,10 @@ PORT=8080 ./serve.sh    # ポートを変える場合
 
 ## 当日の流れ
 
-事前に運営は `./inject-conflict.sh -w 5` と `./serve.sh` を起動しておきます。
+事前に運営は `./serve.sh` を起動しておきます（自動の仕込みも一緒に動きます）。
 
 1. 受講者: 学籍番号のブランチを切り、`学籍番号.md` を add → commit → push する（最初の push は成功する）
-2. 運営（自動）: `inject-conflict.sh -w` が push されたファイルを見つけ、一番下に運営の 1 行（`config.sh` の `INJECT_LINE`）を追記して push する。仕込むのは最初の push の 1 回だけで、解決した後や force push された後にもう一度仕込むことはない
+2. 運営（自動）: `serve.sh` の自動仕込みが push されたファイルを見つけ、一番下に運営の 1 行（`config.sh` の `INJECT_LINE`）を追記して push する。仕込むのは最初の push の 1 回だけで、解決した後や force push された後にもう一度仕込むことはない
 3. 受講者: **ファイルの一番下に** 1 行追加して（例: `- 最近のマイブーム: 〇〇`）add → commit → push → **reject される**
 4. 受講者: `git pull --no-rebase` → コンフリクト → 解決して commit → push
 5. 運営: 投影ページで全員が「解決」になったか確認する

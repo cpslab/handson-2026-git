@@ -26,8 +26,12 @@ fi
 
 g() { git -C "$ADMIN_DIR" "$@"; }
 
-# origin の受講者ブランチを最新化する
-fetch_remote() { g fetch --quiet --prune origin || exit 1; }
+# origin の受講者ブランチを最新化する。
+# NO_FETCH が設定されていれば何もしない (serve.sh では fetch を自動の仕込み側だけに任せ、同時 fetch のぶつかりを避ける)
+fetch_remote() {
+  [ -n "${NO_FETCH:-}" ] && return 0
+  g fetch --quiet --prune origin
+}
 
 # 学籍番号のブランチ名・ファイル名は大文字小文字を区別しない (24fi001 も 24FI001 として扱う)
 # 一覧や記録では大文字にそろえた学籍番号を使う

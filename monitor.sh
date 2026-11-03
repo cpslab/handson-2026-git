@@ -25,7 +25,7 @@ done
 #   row SEP id SEP status SEP author SEP 時刻(unix) SEP 時刻(相対) SEP 件名 SEP 補足 SEP 中身
 # 最後に形式外のブランチ (odd) と名簿にないブランチ (extra) を 1 行ずつ出力する
 collect() {
-  fetch_remote
+  fetch_remote || exit 1
 
   for id in $(all_ids); do
     local branch ref file status note="" author="" ct="" ar="" subject="" content=""
