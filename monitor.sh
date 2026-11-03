@@ -44,6 +44,10 @@ collect() {
         status="NO_FILE"
         note=$(g ls-tree --name-only "$ref" | grep -Ev '^(README|template)\.md$' | tr '\n' ' ')
         [ -n "$note" ] && note="ファイル: $note"
+        # 学籍番号.md を作らずにテンプレートを直接書き換えるミスが多いので知らせる
+        if ! g diff --quiet origin/main "$ref" -- template.md 2>/dev/null; then
+          note="${note:+$note / }template.md を直接編集している (コピーして $id.md にする)"
+        fi
       else
         content=$(g show "$ref:$file" | base64 -w0)
         if g show "$ref:$file" | grep -Eq '^(<<<<<<<|=======|>>>>>>>)'; then
