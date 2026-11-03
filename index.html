@@ -192,9 +192,10 @@
     MARKER_LEFT:  { label: "マーカー残り",     mark: "!", tone: "red" },
     FORCE_PUSHED: { label: "force push",       mark: "!", tone: "red" },
     NO_FILE:      { label: "ファイルなし",     mark: "!", tone: "red" },
+    MERGED_CLEAN: { label: "コンフリクトなし", mark: "!", tone: "red" },
     NO_BRANCH:    { label: "未着手",           mark: "–", tone: "gray" },
   };
-  const PROBLEMS = ["MARKER_LEFT", "FORCE_PUSHED", "NO_FILE"];
+  const PROBLEMS = ["MARKER_LEFT", "FORCE_PUSHED", "NO_FILE", "MERGED_CLEAN"];
   // 集計の並び (進んでいる順)。要対応はまとめて 1 つ
   const GROUPS = [
     ["RESOLVED", "解決", "green"],

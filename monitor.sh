@@ -46,12 +46,11 @@ collect() {
         status="NO_FILE"
         note=$(g ls-tree --name-only "$ref" | grep -Ev '^(README|template)\.md$' | tr '\n' ' ')
         [ -n "$note" ] && note="ファイル: $note"
-      elif [ -n "$inject" ] && [ "$(g rev-parse "$ref")" != "$inject" ] && g diff --quiet "$inject" "$ref" -- "$file"; then
-        # 運営のコミットの後に push があるのに 学籍番号.md が運営の版のまま
-        status="NO_FILE"; note="$file が運営の版のまま"
-        content=$(g show "$ref:$file" | base64 -w0)
       else
         content=$(g show "$ref:$file" | base64 -w0)
+        local merge=""
+        [ -n "$inject" ] && merge=$(g rev-list --merges "$inject..$ref" | tail -1)
+
         if g show "$ref:$file" | grep -Eq '^(<<<<<<<|=======|>>>>>>>)'; then
           status="MARKER_LEFT"; note="コンフリクトマーカーが残ったまま push"
         elif [ -z "$inject" ] && was_injected "$id"; then
@@ -60,7 +59,15 @@ collect() {
           status="PUSHED"
         elif [ "$(g rev-parse "$ref")" = "$inject" ]; then
           status="INJECTED"; note="受講者の対応待ち"
-        elif [ -n "$(g rev-list --merges "$inject..$ref")" ]; then
+        elif [ -n "$merge" ] && g merge-tree --write-tree "$merge^1" "$merge^2" >/dev/null 2>&1; then
+          # 運営の後の merge をやり直してみて、コンフリクトせずにマージできてしまう場合
+          status="MERGED_CLEAN"
+          if g diff --quiet "$inject" "$ref" -- "$file"; then
+            note="$file に受講者の追記がない"
+          else
+            note="一番下以外に追記したためコンフリクトしなかった"
+          fi
+        elif [ -n "$merge" ]; then
           status="RESOLVED"; note="merge で解決"
         else
           status="RESOLVED"; note="merge コミットなし (rebase か、pull 後に編集)"
@@ -68,7 +75,7 @@ collect() {
       fi
 
       # 学籍番号.md を作らずにテンプレートを直接書き換えるミスが多いので知らせる
-      if [ "$status" = NO_FILE ] && ! g diff --quiet origin/main "$ref" -- template.md 2>/dev/null; then
+      if [[ $status =~ ^(NO_FILE|MERGED_CLEAN)$ ]] && ! g diff --quiet origin/main "$ref" -- template.md 2>/dev/null; then
         note="${note:+$note / }template.md を直接編集している (コピーして $id.md にする)"
       fi
 
